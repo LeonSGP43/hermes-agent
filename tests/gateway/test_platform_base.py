@@ -329,6 +329,16 @@ class TestExtractMedia:
         assert media == [("/tmp/Jane Doe/speech.flac", False)]
         assert cleaned == ""
 
+    def test_media_tag_rejects_root_path(self):
+        media, cleaned = BasePlatformAdapter.extract_media("Text\nMEDIA:/")
+        assert media == []
+        assert cleaned == "Text"
+
+    def test_media_tag_rejects_existing_directory(self, tmp_path):
+        media, cleaned = BasePlatformAdapter.extract_media(f"Text\nMEDIA:{tmp_path}")
+        assert media == []
+        assert cleaned == "Text"
+
 
 # ---------------------------------------------------------------------------
 # should_send_media_as_audio
@@ -676,4 +686,3 @@ class TestProxyKwargsForAiohttp:
             sess_kw, req_kw = proxy_kwargs_for_aiohttp("http://proxy:8080")
             assert sess_kw == {}
             assert req_kw == {"proxy": "http://proxy:8080"}
-

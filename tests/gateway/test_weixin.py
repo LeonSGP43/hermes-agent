@@ -542,6 +542,22 @@ class TestWeixinBlankMessagePrevention:
         assert result.success is True
         send_message_mock.assert_not_awaited()
 
+    @patch.object(WeixinAdapter, "_send_text_chunk", new_callable=AsyncMock)
+    @patch.object(WeixinAdapter, "send_document", new_callable=AsyncMock)
+    def test_send_invalid_media_root_sends_text_only(self, send_document_mock, send_text_mock):
+        adapter = _make_adapter()
+        adapter._session = object()
+        adapter._send_session = adapter._session
+        adapter._token = "test-token"
+        adapter._token_store.get = lambda account_id, chat_id: "ctx-token"
+
+        result = asyncio.run(adapter.send("wxid_test123", "Still send text\nMEDIA:/"))
+
+        assert result.success is True
+        send_document_mock.assert_not_awaited()
+        send_text_mock.assert_awaited_once()
+        assert send_text_mock.await_args.kwargs["chunk"] == "Still send text"
+
     def test_send_message_rejects_empty_text(self):
         """_send_message raises ValueError for empty/whitespace text."""
         import pytest
