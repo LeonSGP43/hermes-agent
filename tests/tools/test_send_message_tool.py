@@ -896,6 +896,11 @@ class TestParseTargetRefE164:
         assert chat_id == "+15551234567"
         assert is_explicit is True
 
+    def test_bluebubbles_e164_is_explicit(self):
+        chat_id, _, is_explicit = _parse_target_ref("bluebubbles", "+15551234567")
+        assert chat_id == "+15551234567"
+        assert is_explicit is True
+
     def test_signal_bare_digits_still_work(self):
         """Bare digit strings continue to match the generic numeric branch."""
         chat_id, _, is_explicit = _parse_target_ref("signal", "15551234567")
@@ -914,6 +919,28 @@ class TestParseTargetRefE164:
         assert _parse_target_ref("telegram", "+15551234567")[2] is False
         assert _parse_target_ref("discord", "+15551234567")[2] is False
         assert _parse_target_ref("matrix", "+15551234567")[2] is False
+
+
+class TestParseTargetRefBlueBubbles:
+    """_parse_target_ref recognizes BlueBubbles direct handles as explicit."""
+
+    def test_email_handle_is_explicit(self):
+        chat_id, thread_id, is_explicit = _parse_target_ref(
+            "bluebubbles", "whovianjay14@gmail.com"
+        )
+        assert chat_id == "whovianjay14@gmail.com"
+        assert thread_id is None
+        assert is_explicit is True
+
+    def test_email_handle_strips_whitespace(self):
+        chat_id, _, is_explicit = _parse_target_ref(
+            "bluebubbles", "  whovianjay14@gmail.com  "
+        )
+        assert chat_id == "whovianjay14@gmail.com"
+        assert is_explicit is True
+
+    def test_invalid_email_is_not_explicit(self):
+        assert _parse_target_ref("bluebubbles", "whovianjay14@gmail")[2] is False
 
 
 class TestParseTargetRefSlack:
