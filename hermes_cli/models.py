@@ -2864,8 +2864,11 @@ def _lmstudio_server_root(base_url: Optional[str]) -> Optional[str]:
     Returns ``None`` when the base URL is empty/invalid.
     """
     root = (base_url or "").strip().rstrip("/")
-    if root.endswith("/v1"):
-        root = root[:-3].rstrip("/")
+    lowered = root.lower()
+    for suffix in ("/api/v1", "/v1", "/api"):
+        if lowered.endswith(suffix):
+            root = root[: -len(suffix)].rstrip("/")
+            break
     return root or None
 
 

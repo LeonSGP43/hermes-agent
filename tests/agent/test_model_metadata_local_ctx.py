@@ -445,6 +445,23 @@ class TestDetectLocalServerTypeAuth:
             "Authorization": "Bearer lm-token"
         }
 
+    def test_normalizes_api_v1_base_url_for_lmstudio_probe(self):
+        from agent.model_metadata import detect_local_server_type
+
+        resp = MagicMock()
+        resp.status_code = 200
+
+        client_mock = MagicMock()
+        client_mock.__enter__ = lambda s: client_mock
+        client_mock.__exit__ = MagicMock(return_value=False)
+        client_mock.get.return_value = resp
+
+        with patch("httpx.Client", return_value=client_mock):
+            result = detect_local_server_type("http://localhost:1234/api/v1")
+
+        assert result == "lm-studio"
+        assert client_mock.get.call_args_list[0].args[0] == "http://localhost:1234/api/v1/models"
+
 
 class TestFetchEndpointModelMetadataLmStudio:
     """fetch_endpoint_model_metadata should use LM Studio's native models endpoint."""
@@ -488,6 +505,20 @@ class TestFetchEndpointModelMetadataLmStudio:
         }
         assert result["lmstudio-community/Qwen3.5-27B-GGUF/Qwen3.5-27B-Q8_0.gguf"]["context_length"] == 131072
         assert result["Qwen3.5-27B-GGUF/Qwen3.5-27B-Q8_0.gguf"]["context_length"] == 131072
+
+    def test_uses_native_models_endpoint_for_api_v1_custom_base(self):
+        from agent.model_metadata import fetch_endpoint_model_metadata
+
+        native_resp = self._make_resp({"models": []})
+
+        with patch("agent.model_metadata.detect_local_server_type", return_value="lm-studio"), \
+             patch("agent.model_metadata.requests.get", return_value=native_resp) as mock_get:
+            fetch_endpoint_model_metadata(
+                "http://localhost:1234/api/v1",
+                force_refresh=True,
+            )
+
+        assert mock_get.call_args[0][0] == "http://localhost:1234/api/v1/models"
 
 
 class TestQueryLocalContextLengthNetworkError:

@@ -677,6 +677,22 @@ class TestValidateApiFallback:
 
         assert models == ["publisher/chat-model"]
 
+    def test_fetch_lmstudio_models_normalizes_api_v1_base_url(self):
+        mock_resp = MagicMock()
+        mock_resp.__enter__.return_value = mock_resp
+        mock_resp.__exit__.return_value = False
+        mock_resp.read.return_value = b'{"models":[]}'
+        captured: dict[str, str] = {}
+
+        def _fake_urlopen(request, timeout=None):
+            captured["url"] = request.full_url
+            return mock_resp
+
+        with patch("hermes_cli.models.urllib.request.urlopen", side_effect=_fake_urlopen):
+            fetch_lmstudio_models(base_url="http://localhost:1234/api/v1")
+
+        assert captured["url"] == "http://localhost:1234/api/v1/models"
+
     def test_validate_lmstudio_rejects_embedding_models(self):
         mock_resp = MagicMock()
         mock_resp.__enter__.return_value = mock_resp

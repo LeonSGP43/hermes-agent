@@ -392,6 +392,17 @@ def _normalize_base_url(base_url: str) -> str:
     return (base_url or "").strip().rstrip("/")
 
 
+def _lmstudio_server_root(base_url: str) -> str:
+    """Normalize LM Studio custom-endpoint variants back to the server root."""
+    root = _normalize_base_url(base_url)
+    lowered = root.lower()
+    for suffix in ("/api/v1", "/v1", "/api"):
+        if lowered.endswith(suffix):
+            root = root[: -len(suffix)].rstrip("/")
+            break
+    return root
+
+
 def _auth_headers(api_key: str = "") -> Dict[str, str]:
     token = str(api_key or "").strip()
     if not token:
@@ -549,6 +560,7 @@ def detect_local_server_type(base_url: str, api_key: str = "") -> Optional[str]:
     server_url = normalized
     if server_url.endswith("/v1"):
         server_url = server_url[:-3]
+    lmstudio_server_url = _lmstudio_server_root(normalized) or server_url
 
     headers = _auth_headers(api_key)
 
@@ -556,7 +568,7 @@ def detect_local_server_type(base_url: str, api_key: str = "") -> Optional[str]:
         with httpx.Client(timeout=2.0, headers=headers) as client:
             # LM Studio exposes /api/v1/models — check first (most specific)
             try:
-                r = client.get(f"{server_url}/api/v1/models")
+                r = client.get(f"{lmstudio_server_url}/api/v1/models")
                 if r.status_code == 200:
                     return "lm-studio"
             except Exception:
@@ -774,7 +786,7 @@ def fetch_endpoint_model_metadata(
     if is_local_endpoint(normalized):
         try:
             if detect_local_server_type(normalized, api_key=api_key) == "lm-studio":
-                server_url = normalized[:-3].rstrip("/") if normalized.endswith("/v1") else normalized
+                server_url = _lmstudio_server_root(normalized) or normalized
                 response = requests.get(
                     server_url.rstrip("/") + "/api/v1/models",
                     headers=headers,
