@@ -1482,6 +1482,18 @@ class AIAgent:
             self, user_message, assistant_content, messages, require_workspace
         )
 
+    def _looks_like_codex_terminal_refusal(
+        self,
+        user_message: str,
+        assistant_content: str,
+        messages: List[Dict[str, Any]],
+    ) -> bool:
+        """Forwarder — see ``agent.agent_runtime_helpers.looks_like_codex_terminal_refusal``."""
+        from agent.agent_runtime_helpers import looks_like_codex_terminal_refusal
+        return looks_like_codex_terminal_refusal(
+            self, user_message, assistant_content, messages
+        )
+
     def _extract_reasoning(self, assistant_message) -> Optional[str]:
         """Forwarder — see ``agent.agent_runtime_helpers.extract_reasoning``."""
         from agent.agent_runtime_helpers import extract_reasoning

@@ -4783,17 +4783,38 @@ def run_conversation(
                 )
 
                 _ack_mode = intent_ack_continuation_mode(agent)
+                continuation_prompt = None
                 if (
                     _ack_mode != "off"
                     and agent.valid_tool_names
                     and codex_ack_continuations < 2
-                    and agent._looks_like_codex_intermediate_ack(
+                ):
+                    if agent._looks_like_codex_intermediate_ack(
                         user_message=user_message,
                         assistant_content=final_response,
                         messages=messages,
                         require_workspace=(_ack_mode == "codex_only"),
-                    )
-                ):
+                    ):
+                        continuation_prompt = (
+                            "[System: Continue now. Execute the required tool calls and only "
+                            "send your final answer after completing the task.]"
+                        )
+                    elif (
+                        agent.api_mode == "codex_responses"
+                        and agent._looks_like_codex_terminal_refusal(
+                            user_message=user_message,
+                            assistant_content=final_response,
+                            messages=messages,
+                        )
+                    ):
+                        continuation_prompt = (
+                            "[System: The terminal tool is available in this session. "
+                            "Use the terminal tool directly for the user's immediate command. "
+                            "Do not claim the terminal is unavailable, and do not schedule a "
+                            "cron job unless the user explicitly asked for scheduling.]"
+                        )
+
+                if continuation_prompt:
                     codex_ack_continuations += 1
                     interim_msg = agent._build_assistant_message(assistant_message, "incomplete")
                     messages.append(interim_msg)
@@ -4801,10 +4822,7 @@ def run_conversation(
 
                     continue_msg = {
                         "role": "user",
-                        "content": (
-                            "[System: Continue now. Execute the required tool calls and only "
-                            "send your final answer after completing the task.]"
-                        ),
+                        "content": continuation_prompt,
                     }
                     messages.append(continue_msg)
                     agent._session_messages = messages

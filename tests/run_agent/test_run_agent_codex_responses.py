@@ -1908,6 +1908,45 @@ def test_run_conversation_codex_continues_after_ack_for_directory_listing_prompt
     assert any(msg.get("role") == "tool" and msg.get("tool_call_id") == "call_1" for msg in result["messages"])
 
 
+def test_run_conversation_codex_continues_after_false_terminal_refusal(monkeypatch):
+    agent = _build_agent(monkeypatch)
+    responses = [
+        _codex_message_response("I can't access a terminal tool in this session."),
+        _codex_tool_call_response(),
+        _codex_message_response("hermesdiag"),
+    ]
+    monkeypatch.setattr(agent, "_interruptible_api_call", lambda api_kwargs: responses.pop(0))
+
+    def _fake_execute_tool_calls(assistant_message, messages, effective_task_id):
+        for call in assistant_message.tool_calls:
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": call.id,
+                    "content": '{"stdout":"hermesdiag\\n","exit_code":0}',
+                }
+            )
+
+    monkeypatch.setattr(agent, "_execute_tool_calls", _fake_execute_tool_calls)
+
+    result = agent.run_conversation("Use the terminal to run 'whoami' and tell me only the result.")
+
+    assert result["completed"] is True
+    assert result["final_response"] == "hermesdiag"
+    assert any(
+        msg.get("role") == "assistant"
+        and msg.get("finish_reason") == "incomplete"
+        and "can't access a terminal tool" in (msg.get("content") or "").lower()
+        for msg in result["messages"]
+    )
+    assert any(
+        msg.get("role") == "user"
+        and "The terminal tool is available in this session" in (msg.get("content") or "")
+        for msg in result["messages"]
+    )
+    assert any(msg.get("role") == "tool" and msg.get("tool_call_id") == "call_1" for msg in result["messages"])
+
+
 def test_dump_api_request_debug_uses_responses_url(monkeypatch, tmp_path):
     """Debug dumps should show /responses URL when in codex_responses mode."""
     import json

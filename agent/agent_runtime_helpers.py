@@ -2458,6 +2458,44 @@ def looks_like_codex_intermediate_ack(
     return user_targets_workspace or assistant_targets_workspace
 
 
+def looks_like_codex_terminal_refusal(
+    agent,
+    user_message: Any,
+    assistant_content: str,
+    messages: List[Dict[str, Any]],
+) -> bool:
+    """Detect a false terminal-unavailable stop that should continue."""
+    if any(isinstance(msg, dict) and msg.get("role") == "tool" for msg in messages):
+        return False
+    if "terminal" not in set(getattr(agent, "valid_tool_names", set()) or set()):
+        return False
+
+    assistant_text = agent._strip_think_blocks(assistant_content or "").strip().lower()
+    if not assistant_text or len(assistant_text) > 600:
+        return False
+
+    refusal_patterns = (
+        r"\bi can[’']?t access (?:a |the )?terminal\b",
+        r"\bi can[’']?t run .*?\b(?:in|from) this session\b",
+        r"\bno terminal tool (?:is )?available\b",
+        r"\bterminal tool (?:is )?unavailable\b",
+        r"\b(?:do not|don't) have access to (?:a |the )?terminal\b",
+    )
+    if not any(re.search(pattern, assistant_text) for pattern in refusal_patterns):
+        return False
+
+    from agent.codex_responses_adapter import _summarize_user_message_for_log
+
+    user_text = _summarize_user_message_for_log(user_message).strip().lower()
+    explicit_terminal_request = (
+        "terminal" in user_text
+        or "shell" in user_text
+        or bool(re.search(r"`[^`]+`", user_text))
+        or bool(re.search(r"\brun\b.*['\"`][^'\"`]+['\"`]", user_text))
+    )
+    return explicit_terminal_request
+
+
 def intent_ack_continuation_mode(agent) -> str:
     """Classify the resolved intent-ack continuation mode for this turn.
 
@@ -2969,6 +3007,7 @@ __all__ = [
     "repair_tool_call",
     "sanitize_api_messages",
     "looks_like_codex_intermediate_ack",
+    "looks_like_codex_terminal_refusal",
     "copy_reasoning_content_for_api",
     "cleanup_dead_connections",
     "extract_api_error_context",
